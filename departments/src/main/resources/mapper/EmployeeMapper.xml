@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kised.departments.mapper.EmployeeMapper">
+	<select id="getOrgList" resultType="com.kised.departments.dto.EmployeeDTO">
+		<![CDATA[
+		SELECT t.dept_hier AS deptHier,
+		       t.full_path AS fullPath,
+		       t.dept_name AS deptName,
+		       b.emp_name  AS empName,
+		       b.emp_id    AS empId
+		FROM (SELECT dept_id,
+		             dept_name,
+		             LPAD(' - ', 8 * (LEVEL - 1), ' ') || dept_name   AS dept_hier,
+		             SUBSTR(SYS_CONNECT_BY_PATH(dept_name, ' > '), 4) AS full_path
+		      FROM department START WITH parent_dept_id IS NULL
+		      CONNECT BY PRIOR dept_id = parent_dept_id) t
+			     LEFT JOIN employee b ON t.dept_id = b.dept_id
+		ORDER BY b.dept_id
+		]]>
+	</select>
+
+	<select id="selectAllDepartments" resultType="com.kised.departments.dto.EmployeeDTO">
+		SELECT dept_id   AS deptId,
+		       dept_name AS deptName
+		FROM department
+		ORDER BY dept_name asc
+	</select>
+
+	<insert id="insertEmployee">
+		INSERT INTO employee (emp_id,
+		                      dept_id,
+		                      emp_name,
+		                      role_id)
+		VALUES (emp_seq.NEXTVAL,
+		        #{deptId},
+		        #{empName},
+		        2)
+	</insert>
+
+	<update id="updateEmployeeDept">
+		UPDATE employee
+		SET dept_id = #{deptId}
+		WHERE emp_id = #{empId}
+	</update>
+
+	<delete id="deleteEmployee">
+		DELETE
+		FROM employee
+		WHERE emp_id = #{empId}
+	</delete>
+
+	<select id="findLoginUser" resultType="com.kised.departments.dto.LoginDTO">
+		SELECT e.emp_name  AS empName,
+		       e.emp_id    AS empId,
+		       d.dept_name AS deptName,
+		       e.role_id   AS roleId,
+		       r.role_name AS roleName
+		FROM employee e
+			     LEFT JOIN department d ON e.dept_id = d.dept_id
+			     LEFT JOIN role r ON e.role_id = r.role_id
+		WHERE e.emp_name = #{name}
+		  AND d.dept_name = #{dept}
+	</select>
+
+	<select id="getOrgTree" resultType="com.kised.departments.dto.JsTreeDTO">
+
+		/* 1. 부서 정보 추출 */
+		SELECT 'DEPT_' || dept_id AS id,
+		       CASE
+			       WHEN parent_dept_id IS NULL THEN '#'
+			       ELSE 'DEPT_' || parent_dept_id
+			       END            AS parent,
+		       dept_name          AS text,
+		       'jstree-folder'    AS icon,
+		       1                  AS sort_priority
+		FROM department
+
+		UNION ALL
+
+		/* 2. 직원 정보 추출 */
+		SELECT 'EMP_' || emp_id   AS id,
+		       'DEPT_' || dept_id AS parent,
+		       emp_name || ' '    AS text,
+		       'jstree-file'      AS icon,
+		       0                  AS sort_priority
+		FROM employee
+
+		ORDER BY sort_priority ASC, text ASC
+	</select>
+</mapper>
